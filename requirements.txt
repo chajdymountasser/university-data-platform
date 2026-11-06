@@ -1,0 +1,36 @@
+# ── Phase 1: Ingestion + MinIO Raw Zone (MVP) ──────────────
+boto3>=1.34.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+trafilatura>=1.12.0
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+typer>=0.9.0
+httpx>=0.27.0
+pyyaml>=6.0
+
+# ── Phase 3: Airflow Orchestration ─────────────────────────
+apache-airflow==2.9.1
+apache-airflow-providers-postgres
+
+# ── Phase 2: Spark processing ─────────────────────────────
+pyspark==3.5.3
+numpy>=1.24.0,<2.0.0
+PyMuPDF>=1.24.0
+
+# ── Phase 4: Search (Elasticsearch + Qdrant) ─────────────────
+elasticsearch>=8.12.0,<9
+qdrant-client>=1.9.0
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# ── Embeddings (Google Gemini + local fallback) ──────────────────────
+sentence-transformers>=3.0.0
+torch>=2.0.0
+
+# ── Testing ────────────────────────────────────────────────
+pytest>=8.0.0
+pytest-mock>=3.14.0
+
+# ── Dynamic page scraping (JS-heavy sites) ───────────────
+playwright>=1.42.0

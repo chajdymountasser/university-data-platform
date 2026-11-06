@@ -1,0 +1,59 @@
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ── Virtual environment ──
+venv/
+.venv/
+env/
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Environment ──
+.env
+.env.local
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Tests ──
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ── Playwright ──
+playwright-report/
+test-results/
+
+# ── Airflow ──
+airflow/logs/
+
+# ── Session state  ──
+session state/
+
+# ── Local data ──
+data/
+*.pdf
+*.csv
+*.json
+!sources.yml
+!requirements.txt
+
+# ── LaTeX build artifacts ──
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz

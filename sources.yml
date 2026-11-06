@@ -1,0 +1,74 @@
+# University Data Platform — batch source config (read by Airflow DAG)
+# All sources from Data_platform.md (Morocco university data lake)
+
+sources:
+  # ── 1) University institutional websites ──
+  - type: html
+    url: https://www.um5.ac.ma/
+    source_system: um5_website
+  - type: html
+    url: https://www.uca.ma/
+    source_system: uca_website
+  - type: html
+    url: https://www.usmba.ac.ma/
+    source_system: usmba_website
+    verify_ssl: false
+  - type: html
+    url: https://www.uh2c.ac.ma/
+    source_system: uh2c_website
+  - type: html
+    url: https://www.usms.ac.ma/
+    source_system: usms_website
+  - type: html
+    url: https://www.uiz.ac.ma/
+    source_system: uiz_website
+
+  # ── 2) Student services and governance ──
+  - type: html
+    url: https://www.onousc.ma/
+    source_system: onousc_website
+  - type: html
+    url: https://www.enssup.gov.ma/
+    source_system: enssup_website
+    verify_ssl: false
+  - type: html
+    url: https://www.men.gov.ma/
+    source_system: men_website
+    verify_ssl: false
+
+  # ── 3) Research and publication repositories ──
+  - type: html
+    url: https://www.imist.ma/
+    source_system: imist_website
+  - type: html
+    url: https://toubkal.imist.ma/
+    source_system: toubkal_website
+
+  # ── 4) National open data and statistics ──
+  - type: html
+    url: https://www.data.gov.ma/
+    source_system: datagovma_website
+  - type: html
+    url: https://www.hcp.ma/
+    source_system: hcp_website
+
+  # ── 5) International academic enrichment APIs ──
+  - type: api
+    target: openalex
+    query: "university Morocco"
+    max_pages: 3
+  - type: api
+    target: crossref
+    query: "affiliation Morocco university"
+    max_pages: 3
+  - type: api
+    target: orcid
+    query: "affiliation-org-name:université"
+
+  # ── 6) Training content (open knowledge) ──
+  - type: html
+    url: https://en.wikipedia.org/wiki/Mathematics
+    source_system: wikipedia_math
+  - type: html
+    url: https://en.wikipedia.org/wiki/Category:Mathematics_education
+    source_system: wikipedia_math_edu

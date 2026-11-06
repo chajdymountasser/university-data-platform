@@ -1,0 +1,384 @@
+version: "3.9"
+
+# ── Phase 1 + Phase 3 services ──────────────────────────────
+
+x-airflow-common: &airflow-common
+  build: ./docker/airflow
+  image: university-data-platform-airflow:2.9.1
+  dns:
+    - 8.8.8.8
+    - 1.1.1.1
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-university_platform_secret}
+    AIRFLOW__WEBSERVER__BASE_URL: http://localhost:8083
+    AIRFLOW_FERNET_KEY: ${AIRFLOW_FERNET_KEY:-DQq4lv076nUJuDfZ21x2bHNAEAfU-6Cj3L6UeHxfWso=}
+    MINIO_ENDPOINT: minio:9000
+    MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+    MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    MINIO_USE_SSL: 'false'
+    CONNECTOR_VERSION: 1.0.0
+    DEFAULT_LANGUAGE: fr
+    INGESTION_LOG_LEVEL: INFO
+    AUTO_PLAYWRIGHT: 'true'
+    REQUEST_DELAY: '0.5'
+    ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    QDRANT_HOST: qdrant
+    QDRANT_PORT: 6333
+    TRINO_URL: http://trino:8080/v1/statement
+    _PIP_ADDITIONAL_REQUIREMENTS: ""
+  volumes: &airflow-volumes
+    - .:/opt/airflow/workspace
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - /var/run/docker.sock:/var/run/docker.sock
+  depends_on: &airflow-depends-on
+    airflow-db:
+      condition: service_healthy
+    minio:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  # ── Phase 1: MinIO Raw Storage ──────────────────────────
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    labels:
+      phase: "1"
+    restart: unless-stopped
+
+  # ── Phase 3: Airflow Orchestration ──────────────────────
+  airflow-db:
+    image: postgres:14-alpine
+    container_name: airflow-db
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      phase: "3"
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        pip install -r /opt/airflow/workspace/requirements.txt
+        airflow db init
+        airflow users create \
+          --username ${AIRFLOW_USER:-admin} \
+          --password ${AIRFLOW_PASSWORD:-admin} \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com
+        echo "Admin user ${AIRFLOW_USER:-admin} created"
+    labels:
+      phase: "3"
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: airflow-webserver
+    command: webserver
+    ports:
+      - "8083:8080"
+    labels:
+      phase: "3"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: airflow-scheduler
+    command: scheduler
+    labels:
+      phase: "3"
+    healthcheck:
+      test: ["CMD", "airflow", "jobs", "check", "--job-type", "SchedulerJob", "--hostname", "$$(cat /proc/sys/kernel/hostname)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ── Phase 2: Hive Metastore Database ──────────────────────
+  hive-metastore-db:
+    image: postgres:14-alpine
+    container_name: hive-metastore-db
+    environment:
+      POSTGRES_USER: hive
+      POSTGRES_PASSWORD: hive
+      POSTGRES_DB: metastore_db
+    volumes:
+      - hive_metastore_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "hive"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      phase: "2"
+    restart: unless-stopped
+
+  # ── Phase 2: Hive Metastore ───────────────────────────────
+  hive-metastore:
+    build:
+      context: ./docker/hive
+      dockerfile: Dockerfile
+    container_name: hive-metastore
+    depends_on:
+      hive-metastore-db:
+        condition: service_healthy
+    ports:
+      - "9083:9083"
+    labels:
+      phase: "2"
+    restart: unless-stopped
+
+  # ── Phase 2: Spark Master ─────────────────────────────────
+  spark-master:
+    build:
+      context: ./docker/spark
+      dockerfile: Dockerfile
+    container_name: spark-master
+    command: bin/spark-class org.apache.spark.deploy.master.Master -h spark-master
+    environment:
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
+      SPARK_SSL_ENABLED: "no"
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      HF_HOME: /tmp/hf_cache
+      TRANSFORMERS_CACHE: /tmp/hf_cache
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+    volumes:
+      - .:/opt/spark/apps
+    labels:
+      phase: "2"
+    restart: unless-stopped
+
+  # ── Phase 2: Spark Worker 1 ─────────────────────────────────
+  spark-worker:
+    build:
+      context: ./docker/spark
+      dockerfile: Dockerfile
+    container_name: spark-worker
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 2g
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
+      SPARK_SSL_ENABLED: "no"
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      HF_HOME: /tmp/hf_cache
+      TRANSFORMERS_CACHE: /tmp/hf_cache
+    depends_on:
+      - spark-master
+    volumes:
+      - .:/opt/spark/apps
+    labels:
+      phase: "2"
+    restart: unless-stopped
+
+  # ── Phase 2: Spark Worker 2 ─────────────────────────────────
+  spark-worker-2:
+    build:
+      context: ./docker/spark
+      dockerfile: Dockerfile
+    container_name: spark-worker-2
+    command: bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 2g
+      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
+      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
+      SPARK_SSL_ENABLED: "no"
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      HF_HOME: /tmp/hf_cache
+      TRANSFORMERS_CACHE: /tmp/hf_cache
+    depends_on:
+      - spark-master
+    volumes:
+      - .:/opt/spark/apps
+    labels:
+      phase: "2"
+    restart: unless-stopped
+
+  # ── Phase 2: Trino SQL (Hive-compatible query engine) ────
+  trino:
+    build:
+      context: ./docker/trino
+      dockerfile: Dockerfile
+    container_name: trino
+    depends_on:
+      - hive-metastore
+      - minio
+    ports:
+      - "8081:8080"
+    labels:
+      phase: "2"
+    restart: unless-stopped
+    mem_limit: 4g
+
+  # ── Phase 2: Metabase BI ──────────────────────────────────
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    depends_on:
+      - hive-metastore
+      - trino
+    ports:
+      - "3000:3000"
+    volumes:
+      - metabase_data:/metabase/data
+    labels:
+      phase: "2"
+    restart: unless-stopped
+
+  # ── Phase 4: Elasticsearch (Search + Observability) ──────
+  elasticsearch:
+    image: elasticsearch:8.12.0
+    container_name: elasticsearch
+    environment:
+      - cluster.name=university-search
+      - node.name=es-node-1
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    labels:
+      phase: "4"
+    restart: unless-stopped
+    mem_limit: 2g
+
+  kibana:
+    image: kibana:8.12.0
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    labels:
+      phase: "4"
+    restart: unless-stopped
+
+  # ── Phase 4: Qdrant (Vector Search + RAG) ─────────────────
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    labels:
+      phase: "4"
+    restart: unless-stopped
+
+  # ── Phase 4: Search API (FastAPI) ─────────────────────────
+  search-api:
+    build:
+      context: .
+      dockerfile: docker/search-api/Dockerfile
+    container_name: search-api
+    ports:
+      - "8000:8000"
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ./university_data_platform:/app/university_data_platform
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      DEFAULT_LANGUAGE: ${DEFAULT_LANGUAGE:-fr}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: uvicorn university_data_platform.search.api:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    labels:
+      phase: "4"
+    restart: unless-stopped
+
+volumes:
+  minio_data:
+  airflow_db_data:
+  hive_metastore_data:
+  es_data:
+  qdrant_data:
+  metabase_data:

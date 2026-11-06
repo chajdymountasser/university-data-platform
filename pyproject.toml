@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "university-data-platform"
+version = "1.0.0"
+description = "University data ingestion platform - MinIO raw zone with Airflow orchestration"
+requires-python = ">=3.11"
+dependencies = [
+    "boto3>=1.34.0",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "typer>=0.9.0",
+    "httpx>=0.27.0",
+    "pyyaml>=6.0",
+    "PyMuPDF>=1.24.0",
+    "qdrant-client>=1.9.0",
+    "elasticsearch>=8.12.0",
+    "numpy>=1.24.0,<2.0.0",
+    "sentence-transformers>=3.0.0",
+    "torch>=2.0.0",
+]
+
+[project.optional-dependencies]
+airflow = [
+    "apache-airflow>=2.9.0",
+]
+test = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.14.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-mock>=3.14.0",
+    "apache-airflow>=2.9.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["university_data_platform*"]
+
+[tool.pytest.ini_options]
+testpaths = ["university_data_platform/tests"]

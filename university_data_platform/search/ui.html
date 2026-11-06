@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>University Data Platform — Search</title>
+<style>
+/* ── Reset & Base ──────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f6fa;--surface:#fff;--surface-alt:#f8f9fc;
+  --border:#e2e5ec;--border-light:#eef0f4;
+  --text:#1a1d29;--text-secondary:#5a5f72;--text-muted:#8b90a0;
+  --primary:#3b6cf5;--primary-hover:#2d5ad4;--primary-light:#eef2ff;--primary-bg:rgba(59,108,245,.06);
+  --success:#10b981;--success-bg:#ecfdf5;
+  --warning:#f59e0b;--warning-bg:#fffbeb;
+  --danger:#ef4444;--danger-bg:#fef2f2;
+  --purple:#a855f7;--purple-bg:#fdf4ff;
+  --cyan:#06b6d4;--cyan-bg:#ecfeff;
+  --radius:10px;--radius-sm:6px;--radius-lg:14px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 6px rgba(0,0,0,.05),0 2px 4px rgba(0,0,0,.04);
+  --shadow-lg:0 10px 25px rgba(0,0,0,.08);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+  --mono:"SF Mono","Fira Code","Cascadia Code",Consolas,monospace;
+  --transition:0.2s cubic-bezier(.4,0,.2,1);
+}
+html{font-size:15px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column;transition:background var(--transition),color var(--transition)}
+
+/* ── Dark mode ───────────────────────────────────────────── */
+body.dark{
+  --bg:#0f1117;--surface:#1a1d29;--surface-alt:#22252f;
+  --border:#2d3140;--border-light:#252836;
+  --text:#e8eaf0;--text-secondary:#9ca0b0;--text-muted:#6b7084;
+  --primary:#5b8af5;--primary-hover:#4a7ae0;--primary-light:rgba(91,138,245,.12);--primary-bg:rgba(91,138,245,.08);
+  --success:#34d399;--success-bg:rgba(52,211,153,.1);
+  --warning:#fbbf24;--warning-bg:rgba(251,191,36,.1);
+  --danger:#f87171;--danger-bg:rgba(248,113,113,.1);
+  --purple:#c084fc;--purple-bg:rgba(192,132,252,.1);
+  --cyan:#22d3ee;--cyan-bg:rgba(34,211,238,.1);
+  --shadow:0 1px 3px rgba(0,0,0,.3);
+  --shadow-md:0 4px 6px rgba(0,0,0,.3);
+  --shadow-lg:0 10px 25px rgba(0,0,0,.4);
+}
+body.dark .topbar{background:linear-gradient(135deg,#0f1117 0%,#1a1d29 100%)}
+body.dark .result-card mark{background:rgba(91,138,245,.2);color:var(--primary)}
+body.dark .result-card .card-title mark{background:rgba(91,138,245,.25);color:var(--primary)}
+body.dark .result-card .field .fv mark{background:rgba(91,138,245,.2);color:var(--primary)}
+body.dark .json-modal pre{background:#0f1117;color:#e8eaf0}
+
+/* ── Top bar ──────────────────────────────────────────────── */
+.topbar{background:linear-gradient(135deg,#1a1d29 0%,#252836 100%);color:#fff;padding:0 28px;height:56px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;z-index:100}
+.topbar .brand{display:flex;align-items:center;gap:12px;font-weight:700;font-size:16px;letter-spacing:-.3px}
+.topbar .brand svg{width:28px;height:28px}
+.topbar .brand span.sub{font-weight:400;color:rgba(255,255,255,.5);font-size:13px;margin-left:4px}
+.topbar .right{display:flex;gap:12px;align-items:center}
+.status-bar{display:flex;gap:16px;align-items:center}
+.status-dot{display:flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.7)}
+.status-dot .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.status-dot .dot.ok{background:var(--success);box-shadow:0 0 6px rgba(16,185,129,.5)}
+.status-dot .dot.err{background:var(--danger);box-shadow:0 0 6px rgba(239,68,68,.5)}
+.theme-toggle{background:none;border:1px solid rgba(255,255,255,.2);color:#fff;width:34px;height:34px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:var(--transition)}
+.theme-toggle:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3)}
+.kbd-hint{font-size:11px;color:rgba(255,255,255,.4);background:rgba(255,255,255,.08);padding:2px 8px;border-radius:4px;font-family:var(--mono);margin-right:8px}
+
+/* ── Navigation tabs ──────────────────────────────────────── */
+.nav{display:flex;gap:0;background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;flex-shrink:0;transition:background var(--transition)}
+.nav button{background:none;border:none;color:var(--text-muted);padding:13px 22px;cursor:pointer;font-size:13.5px;font-weight:500;border-bottom:2px solid transparent;transition:var(--transition);font-family:var(--font);position:relative}
+.nav button:hover{color:var(--text);background:var(--primary-bg)}
+.nav button.active{color:var(--primary);border-bottom-color:var(--primary);font-weight:600}
+.nav button .badge{position:absolute;top:8px;right:8px;background:var(--primary);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600}
+
+/* ── Main layout ──────────────────────────────────────────── */
+#main{flex:1;overflow:hidden}
+.tab{display:none;height:100%;overflow:hidden}
+.tab.active{display:flex;flex-direction:column}
+
+/* ── Sidebar + Content split ──────────────────────────────── */
+.split{display:flex;flex:1;overflow:hidden}
+.sidebar{width:280px;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;transition:background var(--transition)}
+.sidebar h3{padding:16px 18px 8px;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:600}
+.sidebar .group{padding:4px 12px 12px}
+.sidebar label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:4px;font-weight:500}
+.sidebar select,.sidebar input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:var(--font);background:var(--surface-alt);color:var(--text);outline:none;transition:var(--transition)}
+.sidebar select:focus,.sidebar input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,108,245,.1)}
+.sidebar .checkbox-group{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.sidebar .chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:20px;font-size:11.5px;cursor:pointer;transition:var(--transition);background:var(--surface);color:var(--text-secondary);user-select:none}
+.sidebar .chip:hover{border-color:var(--primary);color:var(--primary)}
+.sidebar .chip.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.sidebar .btn-apply{margin:12px;padding:9px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;font-family:var(--font);transition:var(--transition)}
+.sidebar .btn-apply:hover{background:var(--primary-hover)}
+.sidebar .btn-reset{margin:0 12px 12px;padding:7px;background:none;color:var(--text-muted);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;cursor:pointer;font-family:var(--font);width:calc(100% - 24px);transition:var(--transition)}
+.sidebar .btn-reset:hover{color:var(--text);border-color:var(--text-muted)}
+.sidebar .facet-block{padding:8px 18px;border-bottom:1px solid var(--border-light)}
+.sidebar .facet-block h4{font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px}
+.sidebar .facet-item{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;color:var(--text-secondary);cursor:pointer;border-radius:4px;padding:4px 6px;margin:1px -6px;transition:var(--transition)}
+.sidebar .facet-item:hover{background:var(--primary-bg);color:var(--primary)}
+.sidebar .facet-item .count{background:var(--surface-alt);border:1px solid var(--border-light);border-radius:10px;padding:1px 7px;font-size:11px;color:var(--text-muted);font-weight:500}
+.sidebar .facet-item.active{color:var(--primary);font-weight:500}
+.sidebar .facet-item.active .count{background:var(--primary-light);color:var(--primary);border-color:var(--primary)}
+
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── Search bar ───────────────────────────────────────────── */
+.search-bar{padding:16px 24px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;transition:background var(--transition)}
+.search-bar .row{display:flex;gap:10px;align-items:stretch;position:relative}
+.search-bar input[type=text]{flex:1;padding:11px 16px;border:2px solid var(--border);border-radius:var(--radius);font-size:15px;font-family:var(--font);outline:none;transition:var(--transition);background:var(--surface);color:var(--text)}
+.search-bar input:focus{border-color:var(--primary);box-shadow:0 0 0 4px rgba(59,108,245,.08)}
+.search-bar input::placeholder{color:var(--text-muted)}
+.search-bar button{padding:11px 28px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);transition:var(--transition);white-space:nowrap}
+.search-bar button:hover{background:var(--primary-hover)}
+.search-bar button:active{transform:scale(.98)}
+.search-bar .meta{display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap}
+.search-bar .meta .pill{font-size:12px;color:var(--text-muted);background:var(--surface-alt);border:1px solid var(--border-light);padding:3px 10px;border-radius:12px;transition:var(--transition)}
+.search-bar .meta .pill strong{color:var(--text);font-weight:600}
+.search-bar .meta .pill.clickable{cursor:pointer;transition:var(--transition)}
+.search-bar .meta .pill.clickable:hover{border-color:var(--primary);color:var(--primary)}
+
+/* ── Search history dropdown ──────────────────────────────── */
+.search-dropdown{position:absolute;top:100%;left:0;right:60px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:50;display:none;max-height:280px;overflow-y:auto}
+.search-dropdown.show{display:block}
+.search-dropdown .dd-header{padding:8px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);font-weight:600;border-bottom:1px solid var(--border-light);display:flex;justify-content:space-between;align-items:center}
+.search-dropdown .dd-header .clear-btn{background:none;border:none;color:var(--primary);cursor:pointer;font-size:11px;font-family:var(--font)}
+.search-dropdown .dd-item{padding:9px 14px;font-size:13px;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:8px;transition:var(--transition)}
+.search-dropdown .dd-item:hover{background:var(--primary-bg);color:var(--primary)}
+.search-dropdown .dd-item .dd-icon{color:var(--text-muted);font-size:12px;flex-shrink:0}
+.search-dropdown .dd-item .dd-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-dropdown .dd-item .dd-remove{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 4px;opacity:0;transition:var(--transition)}
+.search-dropdown .dd-item:hover .dd-remove{opacity:1}
+.search-dropdown .dd-item .dd-remove:hover{color:var(--danger)}
+
+/* ── Results area ─────────────────────────────────────────── */
+.results{flex:1;overflow-y:auto;padding:20px 24px}
+.results-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);gap:12px}
+.results-empty svg{width:48px;height:48px;opacity:.3}
+.results-empty p{font-size:15px}
+.results-empty .hint{font-size:12.5px;color:var(--text-muted);margin-top:4px}
+.results-empty .shortcuts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center}
+.results-empty .shortcut-key{background:var(--surface-alt);border:1px solid var(--border);padding:4px 10px;border-radius:6px;font-size:12px;color:var(--text-secondary);font-family:var(--mono)}
+
+/* ── Entity type summary ──────────────────────────────────── */
+.entity-summary{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.entity-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--surface);cursor:default;transition:var(--transition)}
+.entity-chip .ec-dot{width:8px;height:8px;border-radius:50%}
+.entity-chip.faculty .ec-dot{background:var(--primary)}
+.entity-chip.course .ec-dot{background:var(--success)}
+.entity-chip.news .ec-dot{background:var(--purple)}
+.entity-chip.other .ec-dot{background:var(--text-muted)}
+
+/* ── Result card ──────────────────────────────────────────── */
+.result-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:10px;transition:var(--transition);cursor:default;position:relative;overflow:hidden}
+.result-card:hover{border-color:var(--primary);box-shadow:var(--shadow-md)}
+.result-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px}
+.result-card.type-faculty_profile::before{background:var(--primary)}
+.result-card.type-course_catalog::before{background:var(--success)}
+.result-card.type-university_news::before{background:var(--purple)}
+.result-card.type-other::before{background:var(--text-muted)}
+.result-card .card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:12px}
+.result-card .card-title{font-size:15px;font-weight:600;color:var(--text);line-height:1.4;flex:1}
+.result-card .card-badges{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+.result-card .badge-type{font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.3px}
+.result-card .badge-type.faculty_profile{background:var(--primary-light);color:var(--primary)}
+.result-card .badge-type.course_catalog{background:var(--success-bg);color:var(--success)}
+.result-card .badge-type.university_news{background:var(--purple-bg);color:var(--purple)}
+.result-card .badge-type.other{background:var(--surface-alt);color:var(--text-muted)}
+.result-card .card-score{font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;white-space:nowrap;flex-shrink:0}
+.result-card .card-score.kw{background:var(--primary-light);color:var(--primary)}
+.result-card .card-score.sem{background:var(--purple-bg);color:var(--purple)}
+.result-card .card-score.hybrid{background:var(--success-bg);color:var(--success)}
+.result-card .card-fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 16px;margin-bottom:10px}
+.result-card .field{display:flex;gap:6px;font-size:12.5px;line-height:1.5}
+.result-card .field .fk{color:var(--text-muted);font-weight:500;min-width:90px;flex-shrink:0;text-transform:capitalize}
+.result-card .field .fv{color:var(--text-secondary);word-break:break-word}
+.result-card .card-snippet{font-size:13px;color:var(--text-secondary);line-height:1.6;border-top:1px solid var(--border-light);padding-top:10px;margin-top:4px}
+.result-card .card-snippet.expanded{white-space:pre-wrap}
+.expand-btn{background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;font-weight:600;padding:0 2px;font-family:var(--font);transition:var(--transition)}
+.expand-btn:hover{text-decoration:underline;opacity:.8}
+.result-card .card-snippet mark{background:rgba(59,108,245,.12);color:var(--primary);padding:1px 3px;border-radius:3px;font-weight:500}
+.result-card .card-title mark{background:rgba(59,108,245,.15);color:var(--primary);padding:1px 4px;border-radius:3px;font-weight:600}
+.result-card .field .fv mark{background:rgba(59,108,245,.12);color:var(--primary);padding:1px 3px;border-radius:3px;font-weight:500}
+.json-modal pre mark{background:rgba(59,108,245,.18);color:var(--primary);padding:1px 3px;border-radius:3px;font-weight:600}
+body.dark .json-modal pre mark{background:rgba(91,138,245,.25);color:var(--primary)}
+.result-card .card-id{font-family:var(--mono);font-size:11px;color:var(--text-muted);margin-top:6px;display:flex;align-items:center;gap:8px}
+.result-card .card-id .json-btn{cursor:pointer;color:var(--primary);background:none;border:none;font-family:var(--mono);font-size:11px;padding:2px 6px;border-radius:4px;transition:var(--transition)}
+.result-card .card-id .json-btn:hover{background:var(--primary-bg)}
+.result-card .card-id .copy-btn{cursor:pointer;color:var(--text-muted);background:none;border:none;font-size:11px;padding:2px 6px;border-radius:4px;transition:var(--transition)}
+.result-card .card-id .copy-btn:hover{color:var(--primary);background:var(--primary-bg)}
+
+/* ── Skeleton loading ─────────────────────────────────────── */
+.skeleton{animation:pulse 1.5s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.skeleton-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:10px}
+.skeleton-line{height:12px;background:var(--border-light);border-radius:6px;margin-bottom:8px}
+.skeleton-line.w60{width:60%}
+.skeleton-line.w80{width:80%}
+.skeleton-line.w40{width:40%}
+.skeleton-line.h20{height:20px;width:45%}
+.skeleton-fields{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.skeleton-field{height:14px;background:var(--border-light);border-radius:4px}
+
+/* ── Pagination ───────────────────────────────────────────── */
+.pagination{display:flex;justify-content:center;align-items:center;gap:8px;padding:14px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;transition:background var(--transition)}
+.pagination button{padding:7px 16px;border:1px solid var(--border);background:var(--surface);border-radius:var(--radius-sm);font-size:13px;cursor:pointer;font-family:var(--font);color:var(--text-secondary);transition:var(--transition)}
+.pagination button:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
+.pagination button:disabled{opacity:.4;cursor:not-allowed}
+.pagination button.pg-active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.pagination .pg-info{font-size:12px;color:var(--text-muted)}
+
+/* ── Chat mode (RAG) ─────────────────────────────────────── */
+.chat-wrap{display:flex;flex-direction:column;flex:1;overflow:hidden}
+.chat-msgs{flex:1;overflow-y:auto;padding:24px}
+.chat-msgs .msg{margin-bottom:16px;display:flex;flex-direction:column}
+.chat-msgs .msg.user{align-items:flex-end}
+.chat-msgs .msg .bubble{max-width:80%;padding:12px 18px;border-radius:14px;font-size:14px;line-height:1.6;transition:var(--transition)}
+.chat-msgs .msg.user .bubble{background:var(--primary);color:#fff;border-bottom-right-radius:4px}
+.chat-msgs .msg.assistant .bubble{background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:4px;box-shadow:var(--shadow)}
+.chat-msgs .msg .bubble .rag-answer{font-size:14.5px;line-height:1.7}
+.chat-msgs .msg .bubble .rag-answer p{margin:6px 0}
+.chat-msgs .msg .bubble .rag-sources{margin-top:10px;padding-top:8px;border-top:1px solid var(--border-light)}
+.chat-msgs .msg .bubble .rag-sources summary{cursor:pointer;color:var(--primary);font-weight:500;font-size:12.5px}
+.chat-msgs .msg .bubble .rag-src-card{background:var(--surface-alt);border:1px solid var(--border-light);border-radius:var(--radius-sm);padding:8px 12px;margin-top:6px;font-size:12px}
+.chat-msgs .msg .bubble .rag-src-card .score{color:var(--primary);font-weight:600}
+.chat-input{display:flex;gap:10px;padding:14px 24px;border-top:1px solid var(--border);background:var(--surface)}
+.chat-input textarea{flex:1;border:2px solid var(--border);border-radius:var(--radius);padding:11px 16px;font-size:14px;resize:none;outline:none;font-family:var(--font);transition:var(--transition);min-height:44px;max-height:120px;background:var(--surface);color:var(--text)}
+.chat-input textarea:focus{border-color:var(--primary);box-shadow:0 0 0 4px rgba(59,108,245,.08)}
+.chat-input button{padding:11px 28px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);transition:var(--transition)}
+.chat-input button:hover{background:var(--primary-hover)}
+
+/* ── Loading ──────────────────────────────────────────────── */
+.loading{display:flex;gap:6px;align-items:center;padding:12px 20px}
+.loading span{width:8px;height:8px;background:var(--primary);border-radius:50%;animation:bounce 1.2s infinite}
+.loading span:nth-child(2){animation-delay:.15s}
+.loading span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,80%,100%{transform:scale(.5);opacity:.3}40%{transform:scale(1);opacity:1}}
+
+/* ── Toast notifications ──────────────────────────────────── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 20px;box-shadow:var(--shadow-lg);z-index:300;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text);transform:translateY(100px);opacity:0;transition:all .3s ease}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{border-left:3px solid var(--success)}
+.toast.error{border-left:3px solid var(--danger)}
+
+/* ── Error ────────────────────────────────────────────────── */
+.error-box{color:var(--danger);background:var(--danger-bg);border:1px solid #fecaca;border-radius:var(--radius-sm);padding:10px 14px;margin:8px 0;font-size:13px}
+
+/* ── JSON modal ───────────────────────────────────────────── */
+.json-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.json-modal{background:var(--surface);border-radius:var(--radius-lg);width:min(700px,90vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);overflow:hidden}
+.json-modal .modal-header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border)}
+.json-modal .modal-header h3{font-size:14px;font-weight:600}
+.json-modal .modal-header .modal-actions{display:flex;gap:8px}
+.json-modal .modal-header button{background:none;border:none;font-size:14px;cursor:pointer;color:var(--text-muted);padding:6px 10px;border-radius:4px;font-family:var(--font);transition:var(--transition)}
+.json-modal .modal-header button:hover{background:var(--surface-alt);color:var(--text)}
+.json-modal pre{flex:1;overflow:auto;padding:16px 20px;font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--text);background:var(--surface-alt);margin:0}
+
+/* ── Keyboard shortcut modal ──────────────────────────────── */
+.shortcuts-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:250;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.shortcuts-modal{background:var(--surface);border-radius:var(--radius-lg);width:min(500px,90vw);max-height:70vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);overflow:hidden}
+.shortcuts-modal .modal-header{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--border)}
+.shortcuts-modal .modal-header h3{font-size:14px;font-weight:600}
+.shortcuts-modal .modal-header button{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted);padding:4px 8px;border-radius:4px}
+.shortcuts-modal .modal-header button:hover{background:var(--surface-alt)}
+.shortcuts-modal .shortcut-list{padding:16px 20px;overflow-y:auto}
+.shortcuts-modal .shortcut-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-light)}
+.shortcuts-modal .shortcut-row:last-child{border-bottom:none}
+.shortcuts-modal .shortcut-row .keys{display:flex;gap:4px}
+.shortcuts-modal .shortcut-row kbd{background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-family:var(--mono);font-size:12px;color:var(--text-secondary);min-width:28px;text-align:center}
+.shortcuts-modal .shortcut-row .desc{font-size:13px;color:var(--text)}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media(max-width:800px){
+  .sidebar{display:none}
+  .nav button{padding:10px 14px;font-size:12.5px}
+  .result-card .card-fields{grid-template-columns:1fr}
+  .topbar .brand span.sub{display:none}
+  .kbd-hint{display:none}
+  .status-bar{gap:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ──────────────────────────────────────────── -->
+<div class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="6" fill="#3b6cf5"/><path d="M7 14l5 5 9-9" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>University Search<span class="sub">Data Platform</span></span>
+  </div>
+  <div class="right">
+    <span class="kbd-hint">Press <strong>?</strong> for shortcuts</span>
+    <div class="status-bar">
+      <div class="status-dot"><span class="dot" id="dot-es"></span>ES</div>
+      <div class="status-dot"><span class="dot" id="dot-qdrant"></span>Qdrant</div>
+      <div class="status-dot"><span class="dot" id="dot-trino"></span>Trino</div>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode (Ctrl+D)">&#9789;</button>
+  </div>
+</div>
+
+<!-- ── Navigation ───────────────────────────────────────── -->
+<nav class="nav" id="nav">
+  <button class="active" data-tab="keyword">Keyword Search</button>
+  <button data-tab="semantic">Semantic Search</button>
+  <button data-tab="hybrid">Hybrid Search</button>
+  <button data-tab="rag">RAG Chat</button>
+</nav>
+
+<!-- ── Main content ─────────────────────────────────────── -->
+<div id="main">
+
+<!-- ═══════ KEYWORD SEARCH ═══════ -->
+<div class="tab active" id="tab-keyword">
+  <div class="split">
+    <div class="sidebar" id="sidebar-keyword">
+      <h3>Configuration</h3>
+      <div class="group">
+        <label>Index</label>
+        <select id="kw-index"><option value="">Loading...</option></select>
+      </div>
+      <div class="group">
+        <label>Results per page</label>
+        <select id="kw-size">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+        </select>
+      </div>
+      <div class="group">
+        <label>Sort by</label>
+        <select id="kw-sort">
+          <option value="">Relevance</option>
+          <option value="crawl_timestamp">Crawl date</option>
+          <option value="ingested_at">Ingestion date</option>
+        </select>
+      </div>
+      <div id="kw-facets"></div>
+      <button class="btn-apply" onclick="runKeywordSearch(1)">Apply Filters</button>
+      <button class="btn-reset" onclick="resetKeywordFilters()">Reset</button>
+    </div>
+    <div class="content">
+      <div class="search-bar">
+        <div class="row">
+          <input type="text" id="kw-query" placeholder="Search faculty profiles, courses, documents..." autocomplete="off">
+          <button onclick="runKeywordSearch(1)">Search</button>
+          <div class="search-dropdown" id="kw-dropdown"></div>
+        </div>
+        <div class="meta" id="kw-meta"></div>
+      </div>
+      <div class="results" id="kw-results">
+        <div class="results-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <p>Search across university data</p>
+          <div class="hint">Enter a query above to search Elasticsearch indexes</div>
+          <div class="shortcuts">
+            <span class="shortcut-key">Enter to search</span>
+            <span class="shortcut-key">Ctrl+K to focus</span>
+            <span class="shortcut-key">? for all shortcuts</span>
+          </div>
+        </div>
+      </div>
+      <div class="pagination" id="kw-pagination" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ SEMANTIC SEARCH ═══════ -->
+<div class="tab" id="tab-semantic">
+  <div class="split">
+    <div class="sidebar">
+      <h3>Configuration</h3>
+      <div class="group">
+        <label>Collection</label>
+        <select id="sem-collection"><option value="">Loading...</option></select>
+      </div>
+      <div class="group">
+        <label>Results</label>
+        <select id="sem-limit">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+          <option value="50">50</option>
+        </select>
+      </div>
+      <div class="group">
+        <label>Score threshold</label>
+        <select id="sem-threshold">
+          <option value="">None</option>
+          <option value="0.3">0.3</option>
+          <option value="0.5">0.5</option>
+          <option value="0.7">0.7</option>
+        </select>
+      </div>
+    </div>
+    <div class="content">
+      <div class="search-bar">
+        <div class="row">
+          <input type="text" id="sem-query" placeholder="Semantic query — e.g. 'AI research at the university'" autocomplete="off">
+          <button onclick="runSemanticSearch()">Search</button>
+        </div>
+        <div class="meta" id="sem-meta"></div>
+      </div>
+      <div class="results" id="sem-results">
+        <div class="results-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <p>Semantic vector search</p>
+          <div class="hint">Find conceptually similar documents using Qdrant embeddings</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ HYBRID SEARCH ═══════ -->
+<div class="tab" id="tab-hybrid">
+  <div class="split">
+    <div class="sidebar">
+      <h3>Configuration</h3>
+      <div class="group">
+        <label>Index / Collection</label>
+        <select id="hyb-index"><option value="">Loading...</option></select>
+      </div>
+      <div class="group">
+        <label>Results</label>
+        <select id="hyb-limit">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="20">20</option>
+        </select>
+      </div>
+      <div class="group">
+        <label>Keyword weight</label>
+        <select id="hyb-kw-weight">
+          <option value="0.1">0.1 (semantic-heavy)</option>
+          <option value="0.3" selected>0.3 (balanced)</option>
+          <option value="0.5">0.5 (equal)</option>
+          <option value="0.7">0.7 (keyword-heavy)</option>
+        </select>
+      </div>
+    </div>
+    <div class="content">
+      <div class="search-bar">
+        <div class="row">
+          <input type="text" id="hyb-query" placeholder="Hybrid query — combines keyword + semantic relevance" autocomplete="off">
+          <button onclick="runHybridSearch()">Search</button>
+        </div>
+        <div class="meta" id="hyb-meta"></div>
+      </div>
+      <div class="results" id="hyb-results">
+        <div class="results-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <p>Hybrid search</p>
+          <div class="hint">Combines Elasticsearch keyword matching with Qdrant semantic similarity</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ RAG CHAT ═══════ -->
+<div class="tab" id="tab-rag">
+  <div class="chat-wrap">
+    <div style="padding:10px 24px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;gap:12px;align-items:center;flex-shrink:0">
+      <label style="font-size:12px;color:var(--text-muted);font-weight:500">Collection:</label>
+      <select id="rag-collection" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface-alt)"><option value="">Loading...</option></select>
+      <label style="font-size:12px;color:var(--text-muted);font-weight:500;margin-left:12px">Model:</label>
+      <select id="rag-model" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--surface-alt)">
+        <option value="gemma-4-31b-it">Gemma 4 31B</option>
+        <option value="gemma-4-26b-a4b-it">Gemma 4 26B</option>
+        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+      </select>
+    </div>
+    <div class="chat-msgs" id="rag-messages">
+      <div class="msg assistant"><div class="bubble">
+        <div class="rag-answer">
+          <p><strong>Welcome to RAG Chat</strong> — ask questions about university data.</p>
+          <p style="color:var(--text-muted);font-size:13px;margin-top:8px">Examples:</p>
+          <p style="color:var(--text-muted);font-size:13px">"Who teaches machine learning?" &bull; "What are the admission requirements?" &bull; "List all PhD programs"</p>
+        </div>
+      </div></div>
+    </div>
+    <div class="chat-input">
+      <textarea id="rag-input" rows="1" placeholder="Ask a question about university data... (Shift+Enter for new line)"></textarea>
+      <button id="rag-send">Ask</button>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ═══════ JSON MODAL ═══════ -->
+<div class="json-overlay" id="json-overlay" style="display:none" onclick="if(event.target===this)closeJsonModal()">
+  <div class="json-modal">
+    <div class="modal-header">
+      <h3>Raw JSON Response</h3>
+      <div class="modal-actions">
+        <button onclick="copyJsonToClipboard()" title="Copy to clipboard">Copy</button>
+        <button onclick="closeJsonModal()">&times;</button>
+      </div>
+    </div>
+    <pre id="json-content"></pre>
+  </div>
+</div>
+
+<!-- ═══════ SHORTCUTS MODAL ═══════ -->
+<div class="shortcuts-overlay" id="shortcuts-overlay" style="display:none" onclick="if(event.target===this)closeShortcutsModal()">
+  <div class="shortcuts-modal">
+    <div class="modal-header">
+      <h3>Keyboard Shortcuts</h3>
+      <button onclick="closeShortcutsModal()">&times;</button>
+    </div>
+    <div class="shortcut-list">
+      <div class="shortcut-row"><div class="keys"><kbd>Ctrl</kbd><kbd>K</kbd></div><div class="desc">Focus search input</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>Ctrl</kbd><kbd>D</kbd></div><div class="desc">Toggle dark mode</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>1</kbd>-<kbd>4</kbd></div><div class="desc">Switch tabs (Keyword, Semantic, Hybrid, RAG)</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>Enter</kbd></div><div class="desc">Run search</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>Esc</kbd></div><div class="desc">Close modal / clear search</div></div>
+      <div class="shortcut-row"><div class="keys"><kbd>?</kbd></div><div class="desc">Show this help</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ TOAST ═══════ -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────
+const API = "";
+let currentIndexes = [];
+let currentCollections = [];
+let kwCurrentPage = 1;
+let kwLastResponse = null;
+let currentQuery = "";
+let activeFacetFilters = {};
+let searchHistory = JSON.parse(localStorage.getItem("searchHistory") || "[]");
+let debounceTimer = null;
+
+// ── Init ─────────────────────────────────────────────────
+document.addEventListener("DOMContentLoaded", async () => {
+  loadTheme();
+  await loadHealth();
+  await loadIndexes();
+  setupNav();
+  setupKeyboard();
+  setupSearchHistory();
+});
+
+// ── Theme ────────────────────────────────────────────────
+function loadTheme() {
+  const saved = localStorage.getItem("theme");
+  if (saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+    document.body.classList.add("dark");
+    document.getElementById("theme-toggle").innerHTML = "&#9788;";
+  }
+}
+function toggleTheme() {
+  document.body.classList.toggle("dark");
+  const isDark = document.body.classList.contains("dark");
+  localStorage.setItem("theme", isDark ? "dark" : "light");
+  document.getElementById("theme-toggle").innerHTML = isDark ? "&#9788;" : "&#9789;";
+}
+document.getElementById("theme-toggle").addEventListener("click", toggleTheme);
+
+// ── Health check ─────────────────────────────────────────
+async function loadHealth() {
+  try {
+    const r = await fetchWithTimeout(API + "/health", {}, 10000);
+    const d = await r.json();
+    setDot("dot-es", d.elasticsearch?.status === "healthy");
+    setDot("dot-qdrant", d.qdrant?.status === "healthy");
+    setDot("dot-trino", true);
+  } catch {
+    setDot("dot-es", false);
+    setDot("dot-qdrant", false);
+    setDot("dot-trino", false);
+  }
+}
+function setDot(id, ok) {
+  const el = document.getElementById(id);
+  if (el) el.className = "dot " + (ok ? "ok" : "err");
+}
+
+// ── Load indexes/collections dynamically ─────────────────
+async function loadIndexes() {
+  try {
+    const r = await fetchWithTimeout(API + "/indexes", {}, 10000);
+    const d = await r.json();
+    currentIndexes = d.elasticsearch_indexes || [];
+    currentCollections = d.qdrant_collections || [];
+  } catch {
+    currentIndexes = ["faculty_profiles", "course_catalog"];
+    currentCollections = ["faculty_profiles_chunks", "course_catalog_chunks"];
+  }
+  populateSelect("kw-index", currentIndexes);
+  populateSelect("hyb-index", currentIndexes);
+  populateSelect("sem-collection", currentCollections);
+  const ragSel = document.getElementById("rag-collection");
+  if (ragSel) {
+    ragSel.innerHTML = "";
+    const allOpt = document.createElement("option");
+    allOpt.value = "all"; allOpt.textContent = "📚 All Collections";
+    ragSel.appendChild(allOpt);
+    const fallback = currentCollections.length ? currentCollections : ["faculty_profiles_chunks","course_catalog_chunks"];
+    for (const c of fallback) {
+      const opt = document.createElement("option");
+      opt.value = c; opt.textContent = c;
+      ragSel.appendChild(opt);
+    }
+  }
+}
+
+function populateSelect(id, options) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  sel.innerHTML = "";
+  if (!options.length) {
+    sel.innerHTML = '<option value="">No items found</option>';
+    return;
+  }
+  for (const o of options) {
+    const opt = document.createElement("option");
+    opt.value = o;
+    opt.textContent = o;
+    sel.appendChild(opt);
+  }
+}
+
+// ── Navigation ───────────────────────────────────────────
+function setupNav() {
+  document.querySelectorAll(".nav button").forEach(btn => {
+    btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+  });
+}
+function switchTab(tab) {
+  document.querySelectorAll(".nav button").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelector(`.nav button[data-tab="${tab}"]`)?.classList.add("active");
+  document.getElementById("tab-" + tab)?.classList.add("active");
+  // Focus search input in the new tab
+  const inputMap = { keyword: "kw-query", semantic: "sem-query", hybrid: "hyb-query", rag: "rag-input" };
+  setTimeout(() => document.getElementById(inputMap[tab])?.focus(), 100);
+}
+
+// ── Keyboard shortcuts ───────────────────────────────────
+function setupKeyboard() {
+  document.addEventListener("keydown", e => {
+    // Ctrl+K: focus search
+    if (e.ctrlKey && e.key === "k") {
+      e.preventDefault();
+      const activeTab = document.querySelector(".nav button.active")?.dataset.tab;
+      const inputMap = { keyword: "kw-query", semantic: "sem-query", hybrid: "hyb-query", rag: "rag-input" };
+      document.getElementById(inputMap[activeTab])?.focus();
+    }
+    // Ctrl+D: toggle dark mode
+    if (e.ctrlKey && e.key === "d") {
+      e.preventDefault();
+      toggleTheme();
+    }
+    // ?: show shortcuts (only when not in input)
+    if (e.key === "?" && !["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName)) {
+      e.preventDefault();
+      document.getElementById("shortcuts-overlay").style.display = "flex";
+    }
+    // 1-4: switch tabs (only when not in input)
+    if (!["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName)) {
+      const tabMap = { "1": "keyword", "2": "semantic", "3": "hybrid", "4": "rag" };
+      if (tabMap[e.key]) { e.preventDefault(); switchTab(tabMap[e.key]); }
+    }
+    // Esc: close modals
+    if (e.key === "Escape") {
+      closeJsonModal();
+      closeShortcutsModal();
+      closeSearchDropdown();
+    }
+  });
+
+  // Enter to search
+  document.getElementById("kw-query").addEventListener("keydown", e => { if (e.key === "Enter") runKeywordSearch(1); });
+  document.getElementById("sem-query").addEventListener("keydown", e => { if (e.key === "Enter") runSemanticSearch(); });
+  document.getElementById("hyb-query").addEventListener("keydown", e => { if (e.key === "Enter") runHybridSearch(); });
+  document.getElementById("rag-input").addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); document.getElementById("rag-send").click(); }
+  });
+}
+
+// ── Search history ───────────────────────────────────────
+function setupSearchHistory() {
+  const input = document.getElementById("kw-query");
+  const dropdown = document.getElementById("kw-dropdown");
+
+  input.addEventListener("focus", () => renderSearchDropdown());
+  input.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => renderSearchDropdown(), 150);
+  });
+  document.addEventListener("click", e => {
+    if (!e.target.closest(".search-bar")) closeSearchDropdown();
+  });
+}
+
+function renderSearchDropdown() {
+  const input = document.getElementById("kw-query");
+  const dropdown = document.getElementById("kw-dropdown");
+  if (!searchHistory.length) { closeSearchDropdown(); return; }
+
+  const filtered = input.value
+    ? searchHistory.filter(h => h.toLowerCase().includes(input.value.toLowerCase()))
+    : searchHistory;
+
+  if (!filtered.length) { closeSearchDropdown(); return; }
+
+  let html = `<div class="dd-header"><span>Recent searches</span><button class="clear-btn" onclick="event.stopPropagation();clearSearchHistory()">Clear all</button></div>`;
+  for (const q of filtered.slice(0, 8)) {
+    html += `<div class="dd-item" onclick="event.stopPropagation();selectSearchHistory('${esc(q.replace(/'/g,"\\'"))}')">
+      <span class="dd-icon">&#8635;</span>
+      <span class="dd-text">${esc(q)}</span>
+      <button class="dd-remove" onclick="event.stopPropagation();removeSearchHistory('${esc(q.replace(/'/g,"\\'"))}')" title="Remove">&times;</button>
+    </div>`;
+  }
+  dropdown.innerHTML = html;
+  dropdown.classList.add("show");
+}
+
+function closeSearchDropdown() {
+  document.getElementById("kw-dropdown")?.classList.remove("show");
+}
+
+function selectSearchHistory(q) {
+  document.getElementById("kw-query").value = q;
+  closeSearchDropdown();
+  runKeywordSearch(1);
+}
+
+function addToSearchHistory(q) {
+  if (!q.trim()) return;
+  searchHistory = searchHistory.filter(h => h !== q);
+  searchHistory.unshift(q);
+  searchHistory = searchHistory.slice(0, 20);
+  localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
+}
+
+function removeSearchHistory(q) {
+  searchHistory = searchHistory.filter(h => h !== q);
+  localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
+  renderSearchDropdown();
+}
+
+function clearSearchHistory() {
+  searchHistory = [];
+  localStorage.removeItem("searchHistory");
+  closeSearchDropdown();
+}
+
+// ── Utility ──────────────────────────────────────────────
+function esc(t) { const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+function val(id) { return document.getElementById(id)?.value || ""; }
+
+// ── Fetch with timeout ─────────────────────────────────
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timer);
+    return response;
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === "AbortError") {
+      throw new Error("Request timed out — the server may be slow or unreachable.");
+    }
+    throw e;
+  }
+}
+
+function showSkeleton(containerId, count = 3) {
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  let html = "";
+  for (let i = 0; i < count; i++) {
+    html += `<div class="skeleton-card skeleton">
+      <div class="skeleton-line h20"></div>
+      <div class="skeleton-fields">
+        <div class="skeleton-field"></div>
+        <div class="skeleton-field"></div>
+        <div class="skeleton-field"></div>
+      </div>
+      <div class="skeleton-line w80"></div>
+      <div class="skeleton-line w60"></div>
+    </div>`;
+  }
+  c.innerHTML = html;
+}
+
+function showLoading(containerId) {
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  const d = document.createElement("div");
+  d.className = "loading";
+  d.id = "active-loading";
+  d.innerHTML = "<span></span><span></span><span></span>";
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+}
+function hideLoading() { document.getElementById("active-loading")?.remove(); }
+
+function showToast(message, type = "success") {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.className = "toast " + type + " show";
+  setTimeout(() => toast.classList.remove("show"), 3000);
+}
+
+function showJsonModal(data, query) {
+  const raw = JSON.stringify(data, null, 2);
+  const el = document.getElementById("json-content");
+  if (query) {
+    // Highlight keywords in the JSON display
+    const words = query.split(/\s+/).filter(w => w.length > 1).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    if (words.length) {
+      const re = new RegExp("(" + words.join("|") + ")", "gi");
+      el.innerHTML = esc(raw).replace(re, '<mark>$1</mark>');
+    } else {
+      el.textContent = raw;
+    }
+  } else {
+    el.textContent = raw;
+  }
+  document.getElementById("json-overlay").style.display = "flex";
+}
+function closeJsonModal() {
+  document.getElementById("json-overlay").style.display = "none";
+}
+function copyJsonToClipboard() {
+  const text = document.getElementById("json-content").textContent;
+  navigator.clipboard.writeText(text).then(() => showToast("JSON copied to clipboard"));
+}
+
+function closeShortcutsModal() {
+  document.getElementById("shortcuts-overlay").style.display = "none";
+}
+
+// ── Export ───────────────────────────────────────────────
+function exportResults(format) {
+  if (!kwLastResponse?.hits?.length) return;
+  if (format === "json") {
+    const blob = new Blob([JSON.stringify(kwLastResponse.hits, null, 2)], { type: "application/json" });
+    downloadBlob(blob, "search-results.json");
+  } else if (format === "csv") {
+    const hits = kwLastResponse.hits;
+    const headers = [...new Set(hits.flatMap(h => Object.keys(h._source || {})))];
+    const rows = hits.map(h => headers.map(hdr => JSON.stringify(h._source?.[hdr] ?? "")).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    downloadBlob(blob, "search-results.csv");
+  }
+  showToast(`Exported ${kwLastResponse.hits.length} results as ${format.toUpperCase()}`);
+}
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Render result card ───────────────────────────────────
+// ── Highlight matching keywords in text ──────────────────
+function highlightText(text, query) {
+  if (!query || !text) return esc(text);
+  // Split query into words, filter short ones, escape each for regex
+  const words = query.split(/\s+/).filter(w => w.length > 1).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (!words.length) return esc(text);
+  const re = new RegExp("(" + words.join("|") + ")", "gi");
+  // Escape HTML first, then apply highlights
+  return esc(text).replace(re, '<mark>$1</mark>');
+}
+
+function renderCard(hit, type, query) {
+  const src = hit._source || hit.payload || {};
+  const score = hit._score || hit.score;
+  const id = hit._id || hit.id;
+  const scoreClass = type === "kw" ? "kw" : type === "sem" ? "sem" : "hybrid";
+  const hl = hit.highlight || {};
+
+  // Helper: use ES highlight fragment if available, else fall back to client-side
+  // Checks main field, then common sub-fields (.french, .english, etc.)
+  function esHl(field, fallback, maxLen) {
+    const subFields = [field, field + ".french", field + ".english", field + ".arabic"];
+    for (const f of subFields) {
+      if (hl[f] && hl[f].length) return hl[f][0];
+    }
+    if (fallback != null) {
+      const s = String(fallback);
+      return maxLen ? highlightText(s.slice(0, maxLen), query) : highlightText(s, query);
+    }
+    return "";
+  }
+
+  // Record type badge
+  const recordType = src.record_type || "";
+  const typeBadge = recordType ? `<span class="badge-type ${recordType}">${recordType.replace(/_/g, " ")}</span>` : "";
+
+  const interesting = ["full_name","email","faculty","department","course_name","level","instructor","language","title","source_url","orcid_id","credits","category"];
+  let fields = "";
+  for (const k of interesting) {
+    if (src[k]) fields += `<div class="field"><span class="fk">${esc(k)}</span><span class="fv">${esHl(k, String(src[k]).slice(0,200))}</span></div>`;
+  }
+
+  const text = src.normalized_text || src.chunk_text || src.description || "";
+  let snippet = "";
+  if (text) {
+    const fullText = String(text).replace(/\n/g, " ");
+    // Use ES highlight for snippet if available (check sub-fields too)
+    const esSnippet = (hl.normalized_text || hl["normalized_text.french"] || hl["normalized_text.english"] || hl.description || hl["description.french"] || hl["description.english"] || [])[0];
+    if (esSnippet) {
+      snippet = `<div class="card-snippet">${esSnippet}</div>`;
+    } else if (fullText.length > 200) {
+      const snippetId = "snip-" + Math.random().toString(36).slice(2, 9);
+      snippet = `<div class="card-snippet" id="${snippetId}" data-expanded="0">
+        <span class="snippet-truncated">${highlightText(fullText.slice(0, 200), query)}<button class="expand-btn" onclick="toggleSnippet('${snippetId}')">... ▾</button></span>
+        <span class="snippet-full" style="display:none">${highlightText(fullText, query)}<button class="expand-btn" onclick="toggleSnippet('${snippetId}')">▾ réduire</button></span>
+      </div>`;
+    } else {
+      snippet = `<div class="card-snippet">${highlightText(fullText, query)}</div>`;
+    }
+  }
+
+  const title = src.full_name || src.course_name || src.title || id;
+
+  return `<div class="result-card type-${recordType || 'other'}">
+    <div class="card-header">
+      <div class="card-title">${esHl("title", title, 150)}</div>
+      <div class="card-badges">
+        ${typeBadge}
+        <span class="card-score ${scoreClass}">${typeof score === "number" ? score.toFixed(4) : score}</span>
+      </div>
+    </div>
+    ${fields ? `<div class="card-fields">${fields}</div>` : ""}
+    ${snippet}
+    <div class="card-id">
+      ${esc(String(id))}
+      <button class="json-btn" onclick='showJsonModal(${JSON.stringify(src).replace(/'/g,"&#39;")}, currentQuery)'>{ } JSON</button>
+      <button class="copy-btn" onclick="navigator.clipboard.writeText('${esc(String(id).replace(/'/g,"\\'"))}');showToast('ID copied')">Copy</button>
+    </div>
+  </div>`;
+}
+
+// ── Expand / collapse snippet ──────────────────────────────
+function toggleSnippet(snippetId) {
+  const el = document.getElementById(snippetId);
+  if (!el) return;
+  const truncated = el.querySelector(".snippet-truncated");
+  const full = el.querySelector(".snippet-full");
+  const expanded = el.dataset.expanded === "1";
+  if (expanded) {
+    truncated.style.display = "inline";
+    full.style.display = "none";
+    el.dataset.expanded = "0";
+    el.classList.remove("expanded");
+  } else {
+    truncated.style.display = "none";
+    full.style.display = "inline";
+    el.dataset.expanded = "1";
+    el.classList.add("expanded");
+  }
+}
+
+// ── Render facets in sidebar ─────────────────────────────
+function renderFacets(containerId, facets) {
+  const container = document.getElementById(containerId);
+  if (!container || !facets?.length) return;
+  let html = "";
+  for (const f of facets) {
+    if (!f.buckets?.length) continue;
+    html += `<div class="facet-block"><h4>${esc(f.field)}</h4>`;
+    for (const b of f.buckets.slice(0, 10)) {
+      const active = activeFacetFilters[f.field]?.includes(b.key) ? "active" : "";
+      html += `<div class="facet-item ${active}" onclick="toggleFacet('${esc(f.field)}','${esc(b.key)}')">
+        <span>${esc(b.key)}</span><span class="count">${b.doc_count}</span>
+      </div>`;
+    }
+    html += "</div>";
+  }
+  container.innerHTML = html;
+}
+
+function toggleFacet(field, value) {
+  if (!activeFacetFilters[field]) activeFacetFilters[field] = [];
+  const idx = activeFacetFilters[field].indexOf(value);
+  if (idx >= 0) activeFacetFilters[field].splice(idx, 1);
+  else activeFacetFilters[field].push(value);
+  if (!activeFacetFilters[field].length) delete activeFacetFilters[field];
+  runKeywordSearch(kwCurrentPage);
+}
+
+function resetKeywordFilters() {
+  activeFacetFilters = {};
+  document.getElementById("kw-query").value = "";
+  document.getElementById("kw-facets").innerHTML = "";
+  document.getElementById("kw-results").innerHTML = `<div class="results-empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+    <p>Search across university data</p>
+    <div class="hint">Enter a query above to search Elasticsearch indexes</div>
+    <div class="shortcuts">
+      <span class="shortcut-key">Enter to search</span>
+      <span class="shortcut-key">Ctrl+K to focus</span>
+    </div>
+  </div>`;
+  document.getElementById("kw-pagination").style.display = "none";
+  document.getElementById("kw-meta").innerHTML = "";
+}
+
+// ── Entity summary ───────────────────────────────────────
+function renderEntitySummary(hits) {
+  if (!hits?.length) return "";
+  const counts = {};
+  hits.forEach(h => {
+    const rt = (h._source?.record_type || "other").replace(/_/g, " ");
+    counts[rt] = (counts[rt] || 0) + 1;
+  });
+  const classMap = { "faculty profile": "faculty", "course catalog": "course", "university news": "news", "other": "other" };
+  let html = '<div class="entity-summary">';
+  for (const [label, count] of Object.entries(counts)) {
+    const cls = classMap[label] || "other";
+    html += `<span class="entity-chip ${cls}"><span class="ec-dot"></span>${label}: ${count}</span>`;
+  }
+  html += "</div>";
+  return html;
+}
+
+// ── KEYWORD SEARCH ───────────────────────────────────────
+async function runKeywordSearch(page) {
+  kwCurrentPage = page || 1;
+  const query = val("kw-query");
+  currentQuery = query;
+  const index = val("kw-index");
+  const size = parseInt(val("kw-size")) || 10;
+  const sortBy = val("kw-sort");
+  if (!index) return;
+
+  if (query) addToSearchHistory(query);
+  closeSearchDropdown();
+
+  const container = document.getElementById("kw-results");
+  showSkeleton("kw-results");
+
+  // Facets per index — only fields guaranteed to be keyword type
+  const FACETS_BY_INDEX = {
+    faculty_profiles: ["faculty", "department"],
+    course_catalog: ["faculty", "department"],
+    university_news: ["category"],
+  };
+  const body = { query, size, page: kwCurrentPage, filters: {}, highlight: true };
+  if (sortBy) { body.sort_by = sortBy; body.sort_order = "desc"; }
+  body.facets = FACETS_BY_INDEX[index] || [];
+  for (const [k, v] of Object.entries(activeFacetFilters)) {
+    if (v.length) body.filters[k] = v.length === 1 ? v[0] : v;
+  }
+
+  // Use faceted-search only when facets are available, otherwise plain search
+  const hasFacets = body.facets.length > 0;
+  const endpoint = hasFacets
+    ? `/es/${index}/faceted-search`
+    : `/es/${index}/search`;
+  if (!hasFacets) delete body.facets;
+
+  try {
+    const r = await fetchWithTimeout(API + endpoint, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body)
+    }, 20000);
+    if (!r.ok) { const e = await r.json(); container.innerHTML = `<div class="error-box">${esc(e.detail || "Error")}</div>`; return; }
+    const data = await r.json();
+    kwLastResponse = data;
+
+    // Meta with export
+    document.getElementById("kw-meta").innerHTML = `
+      <span class="pill"><strong>${data.total}</strong> results</span>
+      <span class="pill">${data.took_ms}ms</span>
+      <span class="pill clickable" onclick="showJsonModal(kwLastResponse, currentQuery)">{ } JSON</span>
+      <span class="pill clickable" onclick="exportResults('json')">Export JSON</span>
+      <span class="pill clickable" onclick="exportResults('csv')">Export CSV</span>
+    `;
+
+    // Results with entity summary
+    if (!data.hits?.length) {
+      container.innerHTML = `<div class="results-empty"><p>No results found</p><div class="hint">Try different keywords or adjust filters</div></div>`;
+    } else {
+      container.innerHTML = renderEntitySummary(data.hits) + data.hits.map(h => renderCard(h, "kw", query)).join("");
+    }
+
+    renderFacets("kw-facets", data.facets);
+    renderPagination("kw-pagination", data.total, kwCurrentPage, size, runKeywordSearch);
+  } catch(e) { container.innerHTML = `<div class="error-box">${esc(String(e))}</div>`; }
+}
+
+// ── SEMANTIC SEARCH ──────────────────────────────────────
+async function runSemanticSearch() {
+  const query = val("sem-query");
+  const collection = val("sem-collection");
+  const limit = parseInt(val("sem-limit")) || 10;
+  const threshold = val("sem-threshold");
+  if (!query) return;
+
+  const container = document.getElementById("sem-results");
+  showSkeleton("sem-results");
+
+  const body = { query, limit };
+  if (threshold) body.score_threshold = parseFloat(threshold);
+
+  try {
+    const r = await fetchWithTimeout(API + `/qdrant/semantic-search/${collection}`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body)
+    }, 30000);
+    if (!r.ok) { const e = await r.json(); container.innerHTML = `<div class="error-box">${esc(e.detail || "Error")}</div>`; return; }
+    const data = await r.json();
+
+    document.getElementById("sem-meta").innerHTML = `<span class="pill"><strong>${data.total}</strong> results</span><span class="pill">${data.took_ms}ms</span>`;
+
+    if (!data.hits?.length) {
+      container.innerHTML = `<div class="results-empty"><p>No semantic results</p><div class="hint">Try a more descriptive query</div></div>`;
+    } else {
+      container.innerHTML = renderEntitySummary(data.hits) + data.hits.map(h => renderCard(h, "sem", query)).join("");
+    }
+  } catch(e) { container.innerHTML = `<div class="error-box">${esc(String(e))}</div>`; }
+}
+
+// ── HYBRID SEARCH ────────────────────────────────────────
+async function runHybridSearch() {
+  const query = val("hyb-query");
+  const index = val("hyb-index");
+  const limit = parseInt(val("hyb-limit")) || 10;
+  const kwWeight = parseFloat(val("hyb-kw-weight")) || 0.3;
+  if (!query) return;
+
+  const container = document.getElementById("hyb-results");
+  showSkeleton("hyb-results");
+
+  const body = {
+    query, es_index: index, limit,
+    keyword_weight: kwWeight,
+    semantic_weight: 1 - kwWeight
+  };
+
+  try {
+    const r = await fetchWithTimeout(API + "/qdrant/hybrid-search", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body)
+    }, 30000);
+    if (!r.ok) { const e = await r.json(); container.innerHTML = `<div class="error-box">${esc(e.detail || "Error")}</div>`; return; }
+    const data = await r.json();
+
+    document.getElementById("hyb-meta").innerHTML = `<span class="pill"><strong>${data.total}</strong> fused</span><span class="pill">ES: ${data.es_total}</span><span class="pill">Qdrant: ${data.qdrant_total}</span><span class="pill">${data.took_ms}ms</span>`;
+
+    if (!data.hits?.length) {
+      container.innerHTML = `<div class="results-empty"><p>No hybrid results</p><div class="hint">Try a different query or index</div></div>`;
+    } else {
+      container.innerHTML = renderEntitySummary(data.hits) + data.hits.map(h => renderCard(h, "hyb", query)).join("");
+    }
+  } catch(e) { container.innerHTML = `<div class="error-box">${esc(String(e))}</div>`; }
+}
+
+// ── PAGINATION ───────────────────────────────────────────
+function renderPagination(containerId, total, currentPage, size, callback) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const totalPages = Math.ceil(total / size);
+  if (totalPages <= 1) { container.style.display = "none"; return; }
+  container.style.display = "flex";
+
+  let html = `<button ${currentPage <= 1 ? "disabled" : ""} onclick="window._pgCb(${currentPage - 1})">&laquo; Prev</button>`;
+  // Page numbers (show max 5)
+  const startPage = Math.max(1, currentPage - 2);
+  const endPage = Math.min(totalPages, startPage + 4);
+  for (let i = startPage; i <= endPage; i++) {
+    html += `<button class="${i === currentPage ? 'pg-active' : ''}" onclick="window._pgCb(${i})">${i}</button>`;
+  }
+  html += `<span class="pg-info">Page ${currentPage} of ${totalPages}</span>`;
+  html += `<button ${currentPage >= totalPages ? "disabled" : ""} onclick="window._pgCb(${currentPage + 1})">Next &raquo;</button>`;
+  container.innerHTML = html;
+  window._pgCb = callback;
+}
+
+// ── RAG CHAT ─────────────────────────────────────────────
+document.getElementById("rag-send").addEventListener("click", async () => {
+  const input = document.getElementById("rag-input");
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = "";
+  input.style.height = "auto";
+
+  addChatMsg("rag-messages", "user", esc(q));
+  addChatLoading("rag-messages");
+
+  try {
+    const r = await fetchWithTimeout(API + "/rag/query", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        query: q,
+        collection: val("rag-collection") || "all",
+        max_chunks: 10
+      })
+    }, 60000);
+    removeChatLoading();
+    if (!r.ok) { const e = await r.json(); addChatMsg("rag-messages", "assistant", `<div class="error-box">${esc(e.detail || "Error")}</div>`); return; }
+    const data = await r.json();
+
+    let html = '<div class="rag-answer">' + formatRagAnswer(data.answer || "") + "</div>";
+    if (data.sources?.length) {
+      html += `<details class="rag-sources"><summary>Sources (${data.sources.length})</summary>`;
+      for (const s of data.sources) {
+        const p = s.payload || {};
+        const collLabel = p.collection ? `<span style="color:var(--text-muted);font-size:11px">[${esc(p.collection)}]</span> ` : "";
+        html += `<div class="rag-src-card">${collLabel}<span class="score">Score: ${s.score.toFixed(4)}</span> &mdash; ${esc(String(p.chunk_text || "").slice(0,200))}</div>`;
+      }
+      html += "</details>";
+    }
+    html += `<div style="font-size:11px;color:var(--text-muted);margin-top:6px">${data.took_ms || "?"}ms &bull; ${data.model || ""} &bull; ${data.collection_label || ""}</div>`;
+    addChatMsg("rag-messages", "assistant", html);
+  } catch(e) { removeChatLoading(); addChatMsg("rag-messages", "assistant", `<div class="error-box">${esc(String(e))}</div>`); }
+});
+
+function addChatMsg(containerId, role, html) {
+  const c = document.getElementById(containerId);
+  const d = document.createElement("div");
+  d.className = "msg " + role;
+  d.innerHTML = `<div class="bubble">${html}</div>`;
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+}
+function addChatLoading(containerId) {
+  const c = document.getElementById(containerId);
+  const d = document.createElement("div");
+  d.className = "msg assistant";
+  d.id = "rag-loading";
+  d.innerHTML = '<div class="bubble"><div class="loading"><span></span><span></span><span></span></div></div>';
+  c.appendChild(d);
+  c.scrollTop = c.scrollHeight;
+}
+function removeChatLoading() { document.getElementById("rag-loading")?.remove(); }
+function formatRagAnswer(text) {
+  if (!text) return "<p>(no answer)</p>";
+  return text.split("\n").filter(l => l.trim()).map(l => `<p>${esc(l)}</p>`).join("");
+}
+
+// Auto-resize textarea
+document.getElementById("rag-input").addEventListener("input", function() {
+  this.style.height = "auto";
+  this.style.height = Math.min(this.scrollHeight, 120) + "px";
+});
+</script>
+</body>
+</html>
